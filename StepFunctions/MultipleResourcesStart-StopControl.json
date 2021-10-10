@@ -1,0 +1,158 @@
+{
+    "Comment": "This is your state machine",
+    "StartAt": "Lambda (GetTargetResources)",
+    "States": {
+      "Lambda (GetTargetResources)": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:ap-northeast-1:000000000000:function:GetTargetResources:$LATEST"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException"
+            ],
+            "IntervalSeconds": 2,
+            "MaxAttempts": 6,
+            "BackoffRate": 2
+          }
+        ],
+        "Next": "Wait (SetExecutionDateAndTime)"
+      },
+      "Wait (SetExecutionDateAndTime)": {
+        "Type": "Wait",
+        "Next": "Pass (Debug1)",
+        "TimestampPath": "$.DATE"
+      },
+      "Pass (Debug1)": {
+        "Type": "Pass",
+        "Next": "Map"
+      },
+      "Map": {
+        "Type": "Map",
+        "End": true,
+        "Iterator": {
+          "StartAt": "Pass (Debug2)",
+          "States": {
+            "Pass (Debug2)": {
+              "Type": "Pass",
+              "Next": "Wait (5sec)"
+            },
+            "Wait (5sec)": {
+              "Type": "Wait",
+              "Seconds": 5,
+              "Next": "Lambda (ExecResource)"
+            },
+            "Lambda (ExecResource)": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "arn:aws:lambda:ap-northeast-1:000000000000:function:ExecResource:$LATEST"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6,
+                  "BackoffRate": 2
+                }
+              ],
+              "Next": "Wait"
+            },
+            "Wait": {
+              "Type": "Wait",
+              "Seconds": 5,
+              "Next": "Lambda (StatusCheck)"
+            },
+            "Lambda (StatusCheck)": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "arn:aws:lambda:ap-northeast-1:000000000000:function:StatusCheck:$LATEST"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6,
+                  "BackoffRate": 2
+                }
+              ],
+              "Next": "Pass (Debug3)"
+            },
+            "Pass (Debug3)": {
+              "Type": "Pass",
+              "Next": "Choice (judgement : Response)"
+            },
+            "Choice (judgement : Response)": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.RESPONSE",
+                  "StringEquals": "NEXT",
+                  "Next": "Choice (judgement : NextAction)"
+                },
+                {
+                  "Variable": "$.RESPONSE",
+                  "StringEquals": "ERROR",
+                  "Next": "Fail"
+                }
+              ],
+              "Default": "Fail"
+            },
+            "Choice (judgement : NextAction)": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.NextAction",
+                  "StringEquals": "NEXT",
+                  "Next": "Success"
+                },
+                {
+                  "Variable": "$.NextAction",
+                  "StringEquals": "WAIT",
+                  "Next": "Wait"
+                },
+                {
+                  "Variable": "$.NextAction",
+                  "StringEquals": "SKIP",
+                  "Next": "Success"
+                },
+                {
+                  "Variable": "$.NextAction",
+                  "StringEquals": "ERROR",
+                  "Next": "Fail"
+                }
+              ],
+              "Default": "Fail"
+            },
+            "Fail": {
+              "Type": "Fail"
+            },
+            "Success": {
+              "Type": "Succeed"
+            }
+          }
+        },
+        "MaxConcurrency": 1,
+        "ItemsPath": "$.TARGETS"
+      }
+    }
+  }
